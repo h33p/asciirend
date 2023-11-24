@@ -110,7 +110,6 @@ fn main() -> anyhow::Result<()> {
     let mut ctx = Ctx::default();
     let mut cam_control = CameraController::default();
     cam_control.dist = 30.0;
-    cam_control.orbit_sensitivity = 0.03;
 
     // Dithering enables perceptually smoother color transitions by quantizing output color
     // values with different noise offsets, depending on different pixels.
@@ -182,7 +181,7 @@ fn main() -> anyhow::Result<()> {
 
         // We are able to set how colors will be represented on the terminal
         let color_conv = ColorConvParams {
-            colors: TermColorMode::SingleCol,
+            colors: TermColorMode::Col256,
         };
         let conv_params = (color_conv, ());
 

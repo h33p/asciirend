@@ -7,8 +7,8 @@ server-side rendering of 3D graphics, but not extensive enough for interactivity
 """
 
 from wasmtime.loader import store
-import asciirend as ar
-from asciirend import new_frame, update_camera, new_scene, remove_scene, event_focus, event_mouse_pos, event_mouse_pos_clear, event_mouse_button_state, event_scroll, set_dither_count_frames
+import asciirend.wasm as ar
+from asciirend.wasm import new_frame, update_camera, new_scene, remove_scene, event_focus, event_mouse_pos, event_mouse_pos_clear, event_mouse_button_state, event_scroll, set_dither_count_frames
 import struct
 
 class String:

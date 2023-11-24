@@ -39,6 +39,14 @@ character shading. This also means the rendering backend is agnostic to the avai
 
 Please see [`examples/sample.rs`](examples/sample.rs) for usage sample.
 
-In addition, there are javascript and python samples that use wasm. The API surface is more
-limited, but it enables basic scene rendering. Please see [`web_sample`](web_sample/), and
-[`python`](python/) directories.
+### JavaScript
+
+`asciirend` has a javascript sample that uses WASM. Albeit the API surface is limited, it is 
+possible to use it to draw basic interactive scenes. Please see [`web_sample`](web_sample/)
+directory for details.
+
+### Python
+
+In addition, there is a python sample (and pip package). Please see [`python`](python/)
+subdirectory for more details, or install `asciirend` package, and run the python sample at
+[`sample.py`](sample.py).
