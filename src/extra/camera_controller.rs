@@ -2,6 +2,7 @@ use super::{Ctx, Vector2};
 use nalgebra as na;
 
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum InMotion {
     None,
     Orbit(Vector2, na::UnitQuaternion<f32>),
@@ -12,6 +13,7 @@ enum InMotion {
 ///
 /// This controller enables orbit, pan, and zoom motions using mouse input.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CameraController {
     pub fov_y: f32,
     pub focus_point: na::Point3<f32>,
@@ -37,7 +39,7 @@ impl Default for CameraController {
             dist: 1.0,
             in_motion: InMotion::None,
             scroll_sensitivity: 0.02,
-            orbit_sensitivity: 0.01,
+            orbit_sensitivity: 1.0,
             last_down: false,
             pressed: false,
         }
@@ -74,6 +76,11 @@ impl CameraController {
 
                     // Use euler angles to never have any rolling rotation.
                     let (x, _, z) = start_rot.euler_angles();
+
+                    // The coords are in screen space. Let's divide by the smallest dimension to
+                    // have consistent delta across screen sizes.
+                    let dim = libm::fminf(input.screen_rect.z, input.screen_rect.w);
+                    let delta = delta / dim;
 
                     self.rot = na::UnitQuaternion::from_euler_angles(
                         x - delta.y * self.orbit_sensitivity,

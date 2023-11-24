@@ -1,14 +1,24 @@
 [package]
 name = "asciirend"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Aurimas Blažulionis <0x60@pm.me>"]
 license = "MIT"
 repository = "https://github.com/h33p/asciirend"
 description = "no_std compatible ascii rendering core"
+exclude = [
+	"/.github",
+	"/build_extras.sh",
+	"/python",
+	"/web_sample",
+]
 
-[[bin]]
-name = "example"
+[lib]
+name = "asciirend"
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "sample"
 test = false
 bench = false
 required-features = ["test-bin"]
@@ -18,11 +28,28 @@ nalgebra = { version = "0.32", default-features = false, features = ["macros", "
 libm = "0.2"
 colorsys = { version = "0.6", default-features = false }
 
+serde = { version = "1", default-features = false, features = ["alloc", "derive", "rc"], optional = true }
+
 crossterm = { version = "0.27", optional = true }
 anyhow = { version = "1", optional = true }
 signal-hook = { version = "0.3", optional = true }
 
+wasm-bindgen = { version = "0.2", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+wee_alloc = { version = "0.4", optional = true }
+serde_json = { version = "1", optional = true, default-features = false, features = ["alloc"] }
+
+# Python bindings currently unfinished, use wasi wasm
+#pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
 [features]
-default = ["std"]
-std = ["crossterm"]
-test-bin = ["anyhow", "std", "signal-hook"]
+default = ["std", "serde-all"]
+std = []
+serde-all = ["serde", "nalgebra/serde-serialize-no-std"]
+test-bin = ["anyhow", "std", "signal-hook", "crossterm"]
+bindings = ["serde-all", "serde_json", "global-state"]
+wasm = ["bindings", "wasm-bindgen"]
+global-state = []

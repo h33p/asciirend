@@ -1,5 +1,10 @@
 //! Extra misceleneous structures.
 
+#[cfg(feature = "bindings")]
+pub mod bindings;
+#[cfg(feature = "global-state")]
+pub mod global_state;
+
 pub mod camera_controller;
 use super::*;
 
@@ -46,12 +51,6 @@ impl Default for Ctx {
     }
 }
 
-#[cfg(feature = "crossterm")]
-use crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-};
-
-#[cfg(feature = "crossterm")]
 impl Ctx {
     /// Prepares a new frame with given screen dimensions.
     pub fn new_frame(&mut self, x: u16, y: u16, w: u16, h: u16) {
@@ -59,7 +58,15 @@ impl Ctx {
         self.input.scroll_delta = Vector2::default();
         self.input.screen_rect = Vector4::new(x as f32, y as f32, w as f32, h as f32);
     }
+}
 
+#[cfg(feature = "crossterm")]
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+
+#[cfg(feature = "crossterm")]
+impl Ctx {
     /// Processes a crossterm event.
     pub fn event(&mut self, e: Event) {
         match e {
@@ -138,4 +145,25 @@ pub fn create_transform(
     let mat = translation * rotation_matrix * scale_matrix; //translation * rotation_matrix * scale_matrix;
 
     na::Transform3::from_matrix_unchecked(mat)
+}
+
+pub fn ortho_proj(
+    left: f32,
+    right: f32,
+    bottom: f32,
+    top: f32,
+    znear: f32,
+    zfar: f32,
+) -> na::Orthographic3<f32> {
+    let m = *na::Orthographic3::new(left, right, bottom, top, znear, zfar).as_matrix();
+
+    #[rustfmt::skip]
+    pub const OPENGL_TO_AR_MATRIX: na::Matrix4<f32> = na::matrix![
+        1.0, 0.0, 0.0, 0.0;
+        0.0, 1.0, 0.0, 0.0;
+        0.0, 0.0, 0.5, 0.5;
+        0.0, 0.0, 0.0, 1.0
+    ];
+
+    na::Orthographic3::from_matrix_unchecked(OPENGL_TO_AR_MATRIX * m)
 }

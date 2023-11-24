@@ -1,7 +1,8 @@
 use asciirend::{
-    color::{CrosstermColorMode, CrosstermConvParams},
+    color::{ColorConvParams, TermColorMode},
     dithering::XorShufDither,
     extra::{camera_controller::CameraController, create_transform, Ctx},
+    material::{Diffuse, Material},
     *,
 };
 use crossterm::{
@@ -56,11 +57,10 @@ fn main() -> anyhow::Result<()> {
 
     let _color = bg.color;
 
-    let mut materials = [NormalShading::default()];
-    let mut materials = materials
-        .iter_mut()
-        .map(|v| v as &mut dyn Material)
-        .collect::<Vec<_>>();
+    let materials: &mut [Box<dyn Material>] = &mut [
+        Box::new(Diffuse::default()),
+        Box::new(NormalShading::default()),
+    ];
 
     // Create 3 objects - 2 cubes and 1 line.
     //
@@ -79,7 +79,7 @@ fn main() -> anyhow::Result<()> {
         },
         Object {
             transform: Default::default(),
-            material: 0,
+            material: 1,
             ty: ObjType::Cube {
                 size: Vector3::new(1.0, 1.0, 1.0),
             },
@@ -181,8 +181,8 @@ fn main() -> anyhow::Result<()> {
         }
 
         // We are able to set how colors will be represented on the terminal
-        let color_conv = CrosstermConvParams {
-            colors: CrosstermColorMode::Col256,
+        let color_conv = ColorConvParams {
+            colors: TermColorMode::SingleCol,
         };
         let conv_params = (color_conv, ());
 
@@ -195,7 +195,7 @@ fn main() -> anyhow::Result<()> {
         renderer.render(
             &camera,
             &conv_params,
-            &mut materials,
+            materials,
             &objects,
             &mut dithering,
             &mut buf,
@@ -242,7 +242,7 @@ fn main() -> anyhow::Result<()> {
         let drawn = time.elapsed();
         let drawn_delta = drawn - start;
 
-        let frametime_target = Duration::from_millis(3);
+        let frametime_target = Duration::from_millis(0);
 
         if drawn_delta < frametime_target {
             std::thread::sleep(frametime_target - drawn_delta);
@@ -312,7 +312,8 @@ impl Material for NormalShading {
         (idx, pri)
     }
 
-    fn fragment_shade(&self, triangle: usize, _pos: Vector2, _: f32) -> Option<na::Vector3<f32>> {
-        Some((self.normals[triangle] + na::vector![1.0, 1.0, 1.0]) * 0.5)
+    fn fragment_shade(&self, triangle: usize, _pos: Vector2, _: f32) -> Option<na::Vector4<f32>> {
+        let color = (self.normals[triangle] + na::vector![1.0, 1.0, 1.0]) * 0.5;
+        Some(na::vector![color.x, color.y, color.z, 1.0])
     }
 }

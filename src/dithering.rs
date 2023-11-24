@@ -10,6 +10,7 @@
 ///
 /// Optionally, user may enable frame counter, which will randomize dithering from frame to frame.
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct XorShufDither {
     count_frames: bool,
     frame_cnt: usize,

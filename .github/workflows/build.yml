@@ -24,6 +24,22 @@ jobs:
       - name: Build without examples
         run: cargo build --verbose
 
+  build-wasi:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: ["1.73.0", "stable"]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: wasm32-wasi
+          override: true
+
+      - name: Build WASM module
+        run: cargo build --features=bindings --verbose
+
   build-all-features:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -62,7 +78,7 @@ jobs:
     strategy:
       matrix:
         os: [macos-11, ubuntu-latest, windows-latest]
-        toolchain: ["1.73.0", "stable", "nightly-2023-02-24"]
+        toolchain: ["1.73.0", "stable", "nightly-2023-11-20"]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -115,7 +131,7 @@ jobs:
     strategy:
       matrix:
         os: [macos-11, ubuntu-latest, windows-latest]
-        toolchain: ["1.73.0", "stable", "nightly-2023-02-24"]
+        toolchain: ["1.73.0", "stable", "nightly-2023-11-20"]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -145,7 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        toolchain: ["nightly-2023-02-24"]
+        toolchain: ["nightly-2023-11-20"]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1

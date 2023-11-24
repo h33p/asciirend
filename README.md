@@ -35,6 +35,10 @@ dithering algorithm. This allows the image to have clearer color transitions, as
 character shading. This also means the rendering backend is agnostic to the available color space
 (so long as it's not HDR!), which is important for a generic `no_std` compatible renderer.
 
-## Example
+## Examples
 
-Please see [`src/bin/example.rs`](src/bin/example.rs) for usage sample.
+Please see [`examples/sample.rs`](examples/sample.rs) for usage sample.
+
+In addition, there are javascript and python samples that use wasm. The API surface is more
+limited, but it enables basic scene rendering. Please see [`web_sample`](web_sample/), and
+[`python`](python/) directories.

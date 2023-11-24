@@ -51,6 +51,8 @@ use dithering::Dithering;
 pub mod color;
 use color::{PixelText, QuantizePixel};
 pub mod extra;
+pub mod material;
+use material::*;
 
 pub type Transform = na::Transform3<f32>;
 pub type Vector2 = na::Vector2<f32>;
@@ -125,6 +127,7 @@ pub fn term_char_aspect() -> (usize, usize) {
 ///
 /// These parameters need to be passed at the start of each frame, and are used to clear the
 /// background with specified color.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Background {
     pub color: Vector3,
 }
@@ -306,39 +309,6 @@ impl VertexState {
     }
 }
 
-/// Defines a material and its shading.
-///
-/// Types that implement this are usually stateful, because instances of `Material` are the ones
-/// responsible for storing per-primitive data, used for fragment shading.
-pub trait Material {
-    /// Indicates the start of new frame.
-    ///
-    /// On new frame, all primitives are discarded, therefore, the material should clear any stored
-    /// data upon this call.
-    fn new_frame(&mut self);
-
-    /// Transforms and registers a primitive.
-    ///
-    /// This function takes a primitive (line/triangle), performs computation, and returns an ID,
-    /// associated with it. The ID will then later be used to call [`Material::fragment_shade`]
-    /// with.
-    ///
-    /// This structure allows materials to store arbitrary data for fragment shading purposes.
-    fn primitive_shade(
-        &mut self,
-        primitive: Primitive,
-        proj: Matrix4,
-        model: Matrix4,
-    ) -> (usize, Primitive);
-
-    /// Shade a primitive at specified position.
-    ///
-    /// Material shall assume that provided position lies within the primitive.
-    ///
-    /// TODO for later: provide mechanisms for interpolating per-point data.
-    fn fragment_shade(&self, primitive: usize, pos: Vector2, depth: f32) -> Option<Vector3>;
-}
-
 #[derive(Default, Debug)]
 struct RasterOutput {
     obj_bb: Vec<Option<(usize, usize, usize, usize)>>,
@@ -388,10 +358,10 @@ impl RasterState {
         self.objs.resize(len, !0usize);
     }
 
-    fn rasterize<T: QuantizePixel>(
+    fn rasterize<T: QuantizePixel, M: Material + ?Sized>(
         &mut self,
         vs: &VertexState,
-        mats: &mut [&mut dyn Material],
+        mats: &mut [impl AsMut<M>],
         max_obj: usize,
         conv_params: &T::Params,
         dithering: &mut impl Dithering,
@@ -412,7 +382,7 @@ impl RasterState {
             },
         ) in vs.primitives.iter()
         {
-            let mat = &mut mats[*mat_idx];
+            let mat = mats[*mat_idx].as_mut();
 
             let mut shade_pixel = |x, y, depth| {
                 assert!(x < self.w);
@@ -440,7 +410,12 @@ impl RasterState {
                     ) {
                         self.depth[bidx] = depth;
                         self.objs[bidx] = *obj_idx;
-                        buf[bidx] = T::quantize_color(conv_params, color, dithering, x, y);
+                        // Currently we only support cutout, although, that could be changed with
+                        // RGB buffer rendering.
+                        if color.w >= 0.5 {
+                            buf[bidx] =
+                                T::quantize_color(conv_params, color.xyz(), dithering, x, y);
+                        }
                     }
                 }
             };
@@ -606,9 +581,16 @@ impl RasterState {
 /// Feel free to use [`extra::create_transform`] function to construct the transformation. While
 /// continuous control of the camera can be set up with
 /// [`extra::camera_controller::CameraController`].
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Camera {
     pub transform: Transform,
     pub proj: na::Projective3<f32>,
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        Self::new(na::Perspective3::new(1f32, 90f32.to_radians(), 0.1, 500.0).to_projective())
+    }
 }
 
 impl Camera {
@@ -621,6 +603,7 @@ impl Camera {
 }
 
 /// Properties for a renderable object.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Object {
     /// Tranformation matrix.
     ///
@@ -641,6 +624,7 @@ pub struct Object {
 }
 
 /// Describes an object shape.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ObjType {
     Cube { size: Vector3 },
     Primitive(Primitive),
@@ -652,7 +636,7 @@ impl ObjType {
         proj: Matrix4,
         model: Matrix4,
         state: &mut VertexState,
-        material: &mut dyn Material,
+        material: &mut (impl Material + ?Sized),
         obj_idx: usize,
         mat_idx: usize,
     ) {
@@ -722,6 +706,7 @@ impl ObjType {
 
 /// General rendering primitives.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Primitive {
     Triangle(Triangle),
     Line(Line),
@@ -732,6 +717,7 @@ pub enum Primitive {
 /// Described rather oddly, in homogeneous coordinates, but oh well. Deal with it. Or if you don't
 /// know how, just keep `w` component set to `1.0` and it should all be good.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Triangle {
     pub a: Vector4,
     pub b: Vector4,
@@ -743,6 +729,7 @@ pub struct Triangle {
 /// Described rather oddly, in homogeneous coordinates, but oh well. Deal with it. Or if you don't
 /// know how, just keep `w` component set to `1.0` and it should all be good.
 #[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Line {
     pub start: Vector4,
     pub end: Vector4,
@@ -773,11 +760,11 @@ impl Renderer {
     ///
     /// This function takes a list of objects, their materials, and draws them to given buffer.
     /// Note that `buf` must be first cleared using [`Renderer::clear_screen`] function.
-    pub fn render<T: QuantizePixel>(
+    pub fn render<T: QuantizePixel, M: Material + ?Sized>(
         &mut self,
         camera: &Camera,
         conv_params: &T::Params,
-        mats: &mut [&mut dyn Material],
+        mats: &mut [impl AsMut<M>],
         objects: &[Object],
         dithering: &mut impl Dithering,
         buf: &mut Vec<T>,
@@ -794,7 +781,7 @@ impl Renderer {
         self.vertex_state.reset();
 
         for mat in mats.iter_mut() {
-            mat.new_frame();
+            mat.as_mut().new_frame();
         }
 
         for (i, obj) in objects.iter().enumerate() {
@@ -805,7 +792,7 @@ impl Renderer {
                 proj,
                 *obj.transform.matrix(),
                 &mut self.vertex_state,
-                mats[obj.material],
+                mats[obj.material].as_mut(),
                 i,
                 obj.material,
             );
@@ -832,11 +819,14 @@ impl Renderer {
         buf: &mut Vec<T>,
     ) {
         for (i, obj) in objects.iter().enumerate() {
-            let Some((min_x, min_y, max_x, max_y)) =
+            let Some((min_x, min_y, mut max_x, mut max_y)) =
                 self.fragment_state.output.obj_bb.get(i).and_then(|v| *v)
             else {
                 continue;
             };
+
+            max_x += 1;
+            max_y += 1;
 
             if max_y - min_y < 3 {
                 continue;
@@ -873,13 +863,13 @@ impl Renderer {
                 let mx = libm::roundf(screen.x) as usize;
                 let my = libm::roundf(screen.y) as usize;
                 if max_y != min_y {
-                    mid_y = core::cmp::min(core::cmp::max(my, min_y + 1), max_y - 1);
+                    mid_y = core::cmp::min(core::cmp::max(my, min_y + 1), max_y - 2);
                 }
 
                 if max_x != min_x {
                     mid_x = core::cmp::min(
                         core::cmp::max(mx, min_x + left_chars + 1),
-                        max_x - right_chars - 1,
+                        max_x - right_chars - 2,
                     );
                 }
             }

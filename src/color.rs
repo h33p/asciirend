@@ -1,7 +1,7 @@
 //! Color related types and functions.
 
 use crate::{Dithering, Vector3};
-use colorsys::{Hsl, Rgb};
+use colorsys::{Ansi256, Hsl, Rgb};
 use nalgebra as na;
 
 // Split between dark and light variants, because their hue is the same. This way we can compute
@@ -333,6 +333,29 @@ impl QuantizePixel for Col16 {
     }
 }
 
+impl PixelDarken for Col16 {
+    fn darken(&mut self) {
+        match self {
+            Self::White => *self = Self::Gray,
+            Self::Gray => *self = Self::DarkGray,
+            Self::DarkGray => *self = Self::Black,
+            Self::Red => *self = Self::DarkRed,
+            Self::Green => *self = Self::DarkGreen,
+            Self::Yellow => *self = Self::DarkYellow,
+            Self::Blue => *self = Self::DarkBlue,
+            Self::Magenta => *self = Self::DarkMagenta,
+            Self::Cyan => *self = Self::DarkCyan,
+            Self::DarkRed => *self = Self::Black,
+            Self::DarkGreen => *self = Self::Black,
+            Self::DarkYellow => *self = Self::Black,
+            Self::DarkBlue => *self = Self::Black,
+            Self::DarkMagenta => *self = Self::Black,
+            Self::DarkCyan => *self = Self::Black,
+            Self::Black => (),
+        }
+    }
+}
+
 impl<A: QuantizePixel, B: QuantizePixel> QuantizePixel for (A, B) {
     type Params = (A::Params, B::Params);
 
@@ -363,17 +386,127 @@ impl<A: PixelDarken, B: PixelText> PixelText for (A, B) {
     }
 }
 
-#[cfg(feature = "crossterm")]
-pub struct CrosstermConvParams {
-    pub colors: CrosstermColorMode,
+#[cfg_attr(
+    all(not(target_os = "wasi"), feature = "wasm-bindgen"),
+    wasm_bindgen::prelude::wasm_bindgen
+)]
+#[cfg_attr(feature = "pyo3", pyo3::pyclass)]
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct ColorConvParams {
+    pub colors: TermColorMode,
 }
 
-#[cfg(feature = "crossterm")]
-pub enum CrosstermColorMode {
+#[cfg_attr(
+    all(not(target_os = "wasi"), feature = "wasm-bindgen"),
+    wasm_bindgen::prelude::wasm_bindgen
+)]
+#[cfg_attr(feature = "pyo3", pyo3::pyclass)]
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum TermColorMode {
+    SingleCol = 0,
+    Col16 = 1,
+    Col256 = 2,
+    Rgb = 3,
+}
+
+#[derive(Clone)]
+pub enum TermColor {
     SingleCol,
-    Col16,
-    Col256,
-    Rgb,
+    Col16(Col16),
+    Col256(Ansi256),
+    Rgb(Rgb),
+}
+
+impl From<Col16> for Rgb {
+    fn from(col: Col16) -> Self {
+        let rgb = col.as_vec() * 255.0;
+        Self::new(rgb.x as f64, rgb.y as f64, rgb.z as f64, None)
+    }
+}
+
+impl From<TermColor> for Rgb {
+    fn from(col: TermColor) -> Self {
+        match col {
+            TermColor::SingleCol => Col16::White.into(),
+            TermColor::Col16(col) => col.into(),
+            TermColor::Col256(ansi) => ansi.into(),
+            TermColor::Rgb(rgb) => rgb,
+        }
+    }
+}
+
+impl TermColor {
+    pub fn as_rgb(&self) -> [u8; 3] {
+        let rgb = Rgb::from(self.clone());
+        [rgb.red() as u8, rgb.green() as u8, rgb.blue() as u8]
+    }
+
+    pub fn from_rgb([r, g, b]: [u8; 3]) -> Self {
+        Self::Rgb(Rgb::new(r as f64, g as f64, b as f64, None))
+    }
+}
+
+impl QuantizePixel for TermColor {
+    type Params = ColorConvParams;
+
+    fn quantize_color(
+        params: &Self::Params,
+        inp: Vector3,
+        dithering: &impl Dithering,
+        x: usize,
+        y: usize,
+    ) -> Self {
+        use TermColorMode::*;
+
+        match params.colors {
+            SingleCol => TermColor::SingleCol,
+            Col16 => TermColor::Col16(crate::color::Col16::quantize_color(
+                &(),
+                inp,
+                dithering,
+                x,
+                y,
+            )),
+            Col256 => {
+                // We are doing something very ugly and inaccurate here, but hey, it's fast!
+                let r = core::cmp::min(dithered_range(inp.x, 8, dithering, x, y) * 32, 255) as u8;
+                let g = core::cmp::min(dithered_range(inp.y, 8, dithering, x, y) * 32, 255) as u8;
+                let b = core::cmp::min(dithered_range(inp.z, 4, dithering, x, y) * 64, 255) as u8;
+                let rgb = colorsys::Rgb::from([r, g, b]);
+                let ansi = colorsys::Ansi256::from(rgb);
+                TermColor::Col256(ansi)
+            }
+            Rgb => TermColor::Rgb(colorsys::Rgb::new(
+                dithered_range(inp.x, 255, dithering, x, y) as f64,
+                dithered_range(inp.y, 255, dithering, x, y) as f64,
+                dithered_range(inp.z, 255, dithering, x, y) as f64,
+                None,
+            )),
+        }
+    }
+}
+
+impl PixelDarken for TermColor {
+    fn darken(&mut self) {
+        match self {
+            Self::Col16(v) => v.darken(),
+            Self::Col256(ansi) => {
+                let mut rgb = colorsys::Rgb::from(*ansi);
+                rgb.set_red(rgb.red() / 2.0);
+                rgb.set_green(rgb.green() / 2.0);
+                rgb.set_blue(rgb.blue() / 2.0);
+                *self = Self::Col256(colorsys::Ansi256::from(rgb));
+            }
+            Self::Rgb(rgb) => {
+                rgb.set_red(rgb.red() / 2.0);
+                rgb.set_green(rgb.green() / 2.0);
+                rgb.set_blue(rgb.blue() / 2.0);
+            }
+            _ => (),
+        }
+    }
 }
 
 #[cfg(feature = "crossterm")]
@@ -405,8 +538,32 @@ const _: () = {
         }
     }
 
+    impl From<TermColor> for Color {
+        fn from(col: TermColor) -> Self {
+            match col {
+                TermColor::SingleCol => Self::White,
+                TermColor::Col16(c) => c.into(),
+                TermColor::Col256(ansi) => Self::AnsiValue(ansi.code()),
+                TermColor::Rgb(rgb) => Self::Rgb {
+                    r: rgb.red() as u8,
+                    g: rgb.green() as u8,
+                    b: rgb.blue() as u8,
+                },
+            }
+        }
+    }
+
+    impl From<TermColor> for Option<Color> {
+        fn from(col: TermColor) -> Self {
+            match col {
+                TermColor::SingleCol => None,
+                v => Some(v.into()),
+            }
+        }
+    }
+
     impl QuantizePixel for Colors {
-        type Params = CrosstermConvParams;
+        type Params = ColorConvParams;
 
         fn quantize_color(
             params: &Self::Params,
@@ -415,43 +572,8 @@ const _: () = {
             x: usize,
             y: usize,
         ) -> Self {
-            use CrosstermColorMode::*;
-
-            let col = match params.colors {
-                SingleCol => {
-                    return Self {
-                        foreground: None,
-                        background: None,
-                    }
-                }
-                Col16 => Color::from(crate::color::Col16::quantize_color(
-                    &(),
-                    inp,
-                    dithering,
-                    x,
-                    y,
-                )),
-                Col256 => {
-                    // We are doing something very ugly and inaccurate here, but hey, it's fast!
-                    let r =
-                        core::cmp::min(dithered_range(inp.x, 8, dithering, x, y) * 32, 255) as u8;
-                    let g =
-                        core::cmp::min(dithered_range(inp.y, 8, dithering, x, y) * 32, 255) as u8;
-                    let b =
-                        core::cmp::min(dithered_range(inp.z, 4, dithering, x, y) * 64, 255) as u8;
-                    let rgb = colorsys::Rgb::from([r, g, b]);
-                    let ansi = colorsys::Ansi256::from(rgb);
-                    Color::AnsiValue(ansi.code())
-                }
-                Rgb => Color::Rgb {
-                    r: dithered_range(inp.x, 255, dithering, x, y) as u8,
-                    g: dithered_range(inp.y, 255, dithering, x, y) as u8,
-                    b: dithered_range(inp.z, 255, dithering, x, y) as u8,
-                },
-            };
-
             Self {
-                foreground: Some(col),
+                foreground: TermColor::quantize_color(params, inp, dithering, x, y).into(),
                 background: None,
             }
         }
