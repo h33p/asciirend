@@ -41,8 +41,9 @@ wee_alloc = { version = "0.4", optional = true }
 serde_json = { version = "1", optional = true, default-features = false, features = ["alloc"] }
 
 rhai = { version = "1", optional = true, default-features = false, features = ["std", "f32_float"] }
-#[target.'cfg(target_arch = "wasm32")'.dependencies]
-#getrandom = { version = "0.2", features = ["js"], optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+rhai = { version = "1", optional = true, default-features = false, features = ["std", "f32_float", "wasm-bindgen"] }
 
 # Python bindings currently unfinished, use wasi wasm
 #pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
@@ -57,5 +58,5 @@ serde-all = ["serde", "nalgebra/serde-serialize-no-std"]
 test-bin = ["anyhow", "std", "signal-hook", "crossterm"]
 bindings = ["serde-all", "serde_json", "global-state"]
 scripting = ["rhai"]
-wasm = ["bindings", "wasm-bindgen", "rhai/wasm-bindgen"]
+wasm = ["bindings", "wasm-bindgen"]
 global-state = []
