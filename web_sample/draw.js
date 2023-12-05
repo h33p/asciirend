@@ -8,13 +8,13 @@ import {
   ProjectionMode,
   set_bg_color,
   set_dither_count_frames,
-  update_camera,
   event_mouse_pos,
   event_mouse_button_state,
   event_focus,
   new_scene,
   add_cube,
   render,
+  set_camera_aspect,
   add_line,
   set_obj_transform,
   color_conv,
@@ -73,7 +73,7 @@ function charWidth(divElement) {
   return [parsedSize / 2.04, parsedSize]
 }
 
-export default async function ascii_render(id, scene_json, is_ortho, fov, znear, zfar) {
+export default async function ascii_render(id, scene_json, is_ortho, fov, znear, zfar, showUsage) {
   await init();
 
   const conv = color_conv(TermColorMode.SingleCol);
@@ -88,7 +88,7 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
 
   console.log(w, h, cw, ch);
 
-  const usage = uiText(scene, "Click and drag", 0, h - 1, w, h);
+  const usage = showUsage ? uiText(scene, "Click and drag", 0, h - 1, w, h) : null;
 
   const startTime = performance.now();
 
@@ -126,7 +126,9 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
   function focusEnter() {
     focused = true;
     event_focus(scene, true);
-    updateUiText(scene, usage, null, 0, h - 1, w, h);
+    if (usage) {
+      updateUiText(scene, usage, null, 0, h - 1, w, h);
+    }
   }
 
   function focusExit() {
@@ -134,7 +136,9 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
     event_mouse_button_state(scene, false, true);
     event_mouse_button_state(scene, false, false);
     event_focus(scene, false)
-    updateUiText(scene, usage, "Click and drag", 0, h - 1, w, h);
+    if (usage) {
+      updateUiText(scene, usage, "Click and drag", 0, h - 1, w, h);
+    }
   }
 
   function scrollEvent(e) {
@@ -190,7 +194,8 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
   });
 
   function nf() {
-    new_frame(scene, is_ortho ? ProjectionMode.Orthographic : ProjectionMode.Perspective, w, h, (w / 2) / h, fov, znear, zfar);
+    set_camera_aspect(scene, (w / 2) / h);
+    new_frame(scene, w, h);
   }
 
   nf()
@@ -202,8 +207,7 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
     const elapsed = performance.now() - startTime;
     performance.mark("asciirend-start-frame");
 
-    update_camera(scene);
-    const render_res = render(scene, conv, w, h);
+    const render_res = render(scene, conv, w, h, elapsed / 1000);
     performance.mark("asciirend-rendered-frame");
 
     let lines = '<pre style="pointer-events: none;">';
@@ -228,7 +232,7 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
     }
 
     performance.mark("asciirend-drawn-frame");
-    console.log(elapsed, elapsed2 - elapsed, performance.measure("frame-time", "asciirend-start-frame", "asciirend-converted-frame"), render_res.length);
+    //console.log(elapsed, elapsed2 - elapsed, performance.measure("frame-time", "asciirend-start-frame", "asciirend-converted-frame"), render_res.length);
 
     nf()
   }, 4);

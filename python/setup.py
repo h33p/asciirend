@@ -13,7 +13,7 @@ class CustomInstallCommand(install):
     def run(self):
         # Build the wasm module using Cargo
         subprocess.check_call(
-            ['cargo', 'build', '--release', '--target=wasm32-wasi', '--features=bindings'],
+            ['cargo', 'build', '--release', '--target=wasm32-wasi', '--features=bindings,scripting'],
             cwd=repo_root
         )
         # Strip the wasm binary
@@ -34,7 +34,7 @@ class CustomInstallCommand(install):
 
 setup(
     name='asciirend',
-    version='0.2.1',
+    version='0.3.0',
     packages=find_packages(),
     install_requires=[
         # list of your package dependencies

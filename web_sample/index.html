@@ -4,8 +4,90 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="viewport" content="width=device-width, initial-scale=1 maximum-scale=1">
 	<script type="module">
 		import ascii_render from "./draw.js";
-		const scene_desc = '{"camera":{"transform":[0.8660253,0.49999997,-7.450581e-9,0.0,-0.4330127,0.7499999,-0.49999997,0.0,-0.25,0.4330127,0.8660253,0.0,0.4330127,-0.75,0.49999997,1.0],"proj":[1.104,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,-0.0010000101,0.0,0.0,0.0,-0.00001001358,1.0]},"camera_controller":{"fov_y":1.0,"focus_point":[0.0,0.0,0.0],"rot":[-0.25,-0.0669873,0.25,0.93301266],"dist":1.0,"in_motion":"None","scroll_sensitivity":0.02,"orbit_sensitivity":1.0,"last_down":false,"pressed":false},"objects":[{"transform":[0.91837555,-0.39570975,0.0,0.0,0.39570975,0.91837555,0.0,0.0,0.0,0.0,0.99999994,0.0,0.0,0.0,0.0,1.0],"material":1,"ty":{"Cube":{"size":[1.0,1.0,1.0]}},"text":"Test"}],"bg":{"color":[0.01,0.01,0.01]},"dithering":{"count_frames":false,"frame_cnt":4181}}';
-		ascii_render("frame", scene_desc, true, 1, 0.01, 100);
+		const script = `
+fn frame_update(state, scene, elapsed) {
+
+	let frames = 0;
+
+	if type_of(state) == "i64" {
+		frames = state + 1;
+	}
+
+	if scene.frames == 0 {
+		return frames;
+	}
+
+	// First, update transformation of the cube
+	scene.set_transform(
+		0,
+		create_transform(
+			scene.get_position(0),
+			uq_from_euler(0.0, 0.0, elapsed * 0.5 + 0.53),
+			vec3(1.0, 1.0, 1.0),
+		)
+	);
+
+	const mfio_texts = [
+		"a        ",
+		"as       ",
+		"asc      ",
+		"asci     ",
+		"ascii    ",
+		"asciir   ",
+		"asciire  ",
+		"asciiren ",
+		"asciirend",
+		"*sciirend",
+		"**ciirend",
+		"***iirend",
+		"****irend",
+		"*****rend",
+		"******end",
+		"*******nd",
+		"********d",
+		"*********",
+	];
+
+	// Then move camera to different places
+	const transition = 6.0;
+
+	elapsed = elapsed % (transition * 3.0);
+
+	if elapsed < transition * 0.5 {
+		let in_tr = elapsed / transition / 0.5;
+		scene.camera_dist = 2.0 + 10.0 - 10.0 * in_tr;
+		scene.camera_fov = 60.0;
+		scene.set_text(0, ());
+	} else if elapsed < transition {
+	} else if elapsed < (2.0 - 1.0 / 3.0) * transition {
+		scene.camera_focus = vec3(0.6, 0.0, 0.4);
+		scene.camera_dist = 2.0;
+		scene.camera_rotation = uq_from_euler(-0.15, 0.0, 0.0);
+		scene.camera_fov = 20.0;
+		scene.set_text(0, ());
+	} else if elapsed < 2.0 * transition {
+		scene.camera_rotation = uq_from_euler(-1.57, 0.0, 0.5);
+	} else if elapsed < 2.5 * transition {
+		scene.camera_focus = vec3(0.0, 0.0, 0.0);
+		scene.camera_dist = 2.0;
+		scene.camera_rotation = uq_from_euler(-0.6, 0.0, 0.0);
+		let in_tr = (elapsed / transition - 2.0) / 0.5;
+		scene.camera_fov = 35.0 + in_tr * 55.0;
+		scene.set_text(0, mfio_texts[(in_tr * mfio_texts[0].len() - 0.01).to_int()]);
+	} else if elapsed < 2.7 * transition {
+		let in_tr = (elapsed / transition - 2.5) / 0.2;
+		scene.camera_fov = 90.0 - in_tr * 80.0;
+		scene.set_text(0, mfio_texts[mfio_texts[0].len() + (in_tr * mfio_texts[0].len() - 0.01).to_int()]);
+	} else {
+		scene.set_text(0, ());
+	}
+
+	frames
+}
+		`;
+		const scene_desc = `{"camera_props":{"proj_mode":"Perspective","fov":0.7,"near":0.01,"far":100.0},"camera_controller":{"fov_y":1.0,"focus_point":[0.0,0.0,0.0],"rot":[-0.25,-0.0669873,0.25,0.93301266],"dist":1.0,"in_motion":"None","scroll_sensitivity":0.02,"orbit_sensitivity":1.0,"last_down":false,"pressed":false},"objects":[{"transform":[0.91837555,-0.39570975,0.0,0.0,0.39570975,0.91837555,0.0,0.0,0.0,0.0,0.99999994,0.0,0.0,0.0,0.0,1.0],"material":1,"ty":{"Cube":{"size":[1.0,1.0,1.0]}},"text":"Test"}],"bg":{"color":[0.01,0.01,0.01]},"dithering":{"count_frames":false,"frame_cnt":4181},"script": ${JSON.stringify(script)}}`;
+		console.log(scene_desc);
+		ascii_render("frame", scene_desc, false, 60.0, 0.01, 100);
 	</script>
     <link rel="stylesheet" href="style.css">
   <head>

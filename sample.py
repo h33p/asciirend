@@ -6,5 +6,5 @@ scene_desc = '{"camera":{"transform":[0.8660253,0.49999997,-7.450581e-9,0.0,-0.4
 scale = 2
 w, h = 32 * scale, 9 * scale
 
-scene = ar.ascii_render(scene_desc, 0, w, h, 16 / 9, True, 1.0, 0.01, 100.0)
+scene = ar.ascii_render(scene_desc, 0, w, h, 16 / 9, True, 1.0, 0.01, 100.0, 0.0)
 print(scene)

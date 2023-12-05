@@ -4,7 +4,6 @@ use crate::{
     extra::{
         create_transform,
         global_state::{self as gs, Scene, StandardMaterial},
-        ortho_proj,
     },
     *,
 };
@@ -80,7 +79,10 @@ pub extern "C" fn scene_to_json_tuple(scene: usize) -> *mut StringTuple {
 #[cfg_attr(feature = "pyo3", pyfunction)]
 #[no_mangle]
 pub fn scene_from_json(scene: &str) -> usize {
-    let Some(scene): Option<Scene> = serde_json::from_str(scene).ok() else {
+    #[cfg(feature = "wasm")]
+    crate::extra::bindings::set_panic_hook();
+
+    let Some(scene): Option<Scene> = Some(serde_json::from_str(scene).unwrap()) else {
         return !0usize;
     };
     gs::new_scene(move || scene)
@@ -207,9 +209,15 @@ pub extern "C" fn set_line_points(scene: usize, obj: usize, start: Vec3, end: Ve
 #[cfg_attr(all(not(target_os = "wasi"), feature = "wasm-bindgen"), wasm_bindgen)]
 #[cfg_attr(feature = "pyo3", pyfunction)]
 #[no_mangle]
-pub fn render(scene: usize, color_conv: &ColorConvParams, w: usize, h: usize) -> Vec<RgbPixel> {
+pub fn render(
+    scene: usize,
+    color_conv: &ColorConvParams,
+    w: usize,
+    h: usize,
+    elapsed: f64,
+) -> Vec<RgbPixel> {
     let mut out: Vec<RgbPixel> = vec![];
-    gs::render(scene, color_conv, &mut out, w, h);
+    gs::render(scene, color_conv, &mut out, w, h, elapsed);
     out
 }
 
@@ -219,8 +227,9 @@ pub extern "C" fn render_raw(
     colors: TermColorMode,
     w: usize,
     h: usize,
+    elapsed: f64,
 ) -> *mut RgbPixel {
-    let mut out = render(scene, &ColorConvParams { colors }, w, h);
+    let mut out = render(scene, &ColorConvParams { colors }, w, h, elapsed);
     assert_eq!(out.len(), w * h);
     let ptr = out.as_mut_ptr();
     core::mem::forget(out);
@@ -235,57 +244,17 @@ pub unsafe extern "C" fn free_raw_pixels(pixels: *mut RgbPixel, w: usize, h: usi
 #[cfg_attr(all(not(target_os = "wasi"), feature = "wasm-bindgen"), wasm_bindgen)]
 #[cfg_attr(feature = "pyo3", pyfunction)]
 #[no_mangle]
-pub extern "C" fn update_camera(scene: usize) {
+pub extern "C" fn set_camera_aspect(scene: usize, aspect_ratio: f32) {
     gs::with_scene(scene, |scene| {
-        scene.camera_controller.update(&scene.ctx);
-        scene.camera.transform = scene.camera_controller.transform();
+        scene.camera_props.aspect_ratio = aspect_ratio;
     });
-}
-
-#[cfg_attr(all(not(target_os = "wasi"), feature = "wasm-bindgen"), wasm_bindgen)]
-#[cfg_attr(feature = "pyo3", pyclass)]
-#[derive(Clone, Copy)]
-#[repr(u8)]
-pub enum ProjectionMode {
-    Perspective = 0,
-    Orthographic = 1,
 }
 
 #[cfg_attr(all(not(target_os = "wasi"), feature = "wasm-bindgen"), wasm_bindgen)]
 #[cfg_attr(feature = "pyo3", pyfunction)]
 #[no_mangle]
-pub extern "C" fn new_frame(
-    scene: usize,
-    proj_mode: ProjectionMode,
-    w: usize,
-    h: usize,
-    aspect_ratio: f32,
-    fov: f32,
-    near: f32,
-    far: f32,
-) {
+pub extern "C" fn new_frame(scene: usize, w: usize, h: usize) {
     gs::with_scene(scene, |scene| {
-        match proj_mode {
-            ProjectionMode::Perspective => {
-                scene.camera.proj =
-                    na::Perspective3::new(aspect_ratio, fov.to_radians(), near, far)
-                        .to_projective();
-            }
-            ProjectionMode::Orthographic => {
-                let fov = fov * scene.camera_controller.dist;
-
-                scene.camera.proj = ortho_proj(
-                    -fov * aspect_ratio,
-                    fov * aspect_ratio,
-                    -fov,
-                    fov,
-                    near,
-                    far,
-                )
-                .to_projective();
-            }
-        }
-        scene.camera_controller.fov_y = fov;
         scene.ctx.new_frame(0, 0, w as u16, h as u16);
     });
 }

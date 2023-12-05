@@ -1,6 +1,6 @@
 [package]
 name = "asciirend"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Aurimas Blažulionis <0x60@pm.me>"]
 license = "MIT"
@@ -40,6 +40,10 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 wee_alloc = { version = "0.4", optional = true }
 serde_json = { version = "1", optional = true, default-features = false, features = ["alloc"] }
 
+rhai = { version = "1", optional = true, default-features = false, features = ["std", "f32_float"] }
+#[target.'cfg(target_arch = "wasm32")'.dependencies]
+#getrandom = { version = "0.2", features = ["js"], optional = true }
+
 # Python bindings currently unfinished, use wasi wasm
 #pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
 
@@ -52,5 +56,6 @@ std = []
 serde-all = ["serde", "nalgebra/serde-serialize-no-std"]
 test-bin = ["anyhow", "std", "signal-hook", "crossterm"]
 bindings = ["serde-all", "serde_json", "global-state"]
-wasm = ["bindings", "wasm-bindgen"]
+scripting = ["rhai"]
+wasm = ["bindings", "wasm-bindgen", "rhai/wasm-bindgen"]
 global-state = []

@@ -8,7 +8,7 @@ server-side rendering of 3D graphics, but not extensive enough for interactivity
 
 from wasmtime.loader import store
 import asciirend.wasm as ar
-from asciirend.wasm import new_frame, update_camera, new_scene, remove_scene, event_focus, event_mouse_pos, event_mouse_pos_clear, event_mouse_button_state, event_scroll, set_dither_count_frames
+from asciirend.wasm import new_frame, new_scene, remove_scene, event_focus, event_mouse_pos, event_mouse_pos_clear, event_mouse_button_state, event_scroll, set_camera_aspect, set_dither_count_frames
 import struct
 
 class String:
@@ -102,26 +102,27 @@ def scene_to_json(scene):
     st.free()
     return json
 
-def render(scene, colors, w, h):
-    return Pixels(ar.render_raw(scene, colors, w, h), w, h)
+def render(scene, colors, w, h, elapsed):
+    return Pixels(ar.render_raw(scene, colors, w, h, elapsed), w, h)
 
-def ascii_render_pixels(scene_desc, colors, w, h, aspect, is_ortho, fov, znear, zfar):
+def ascii_render_pixels(scene_desc, colors, w, h, aspect, is_ortho, fov, znear, zfar, elapsed):
     scene = scene_from_json(scene_desc)
     assert scene != -1;
     if is_ortho:
         proj = 1
     else:
         proj = 0
-    new_frame(scene, proj, w, h, aspect, fov, znear, zfar)
-    ret = render(scene, colors, w, h)
+    set_camera_aspect(scene, aspect)
+    new_frame(scene, w, h)
+    ret = render(scene, colors, w, h, elapsed)
     remove_scene(scene)
     return ret
 
 # This one mimicks the javascript API, although here we are able to set arbitrary dimensions
 #
 # If you wish to receive [Pixel], instead of string, use ascii_render_pixels, but be sure to free them!
-def ascii_render(scene_desc, colors, w, h, aspect, is_ortho, fov, znear, zfar):
-    pixels = ascii_render_pixels(scene_desc, colors, w, h, aspect, is_ortho, fov, znear, zfar)
+def ascii_render(scene_desc, colors, w, h, aspect, is_ortho, fov, znear, zfar, elapsed):
+    pixels = ascii_render_pixels(scene_desc, colors, w, h, aspect, is_ortho, fov, znear, zfar, elapsed)
     ret = pixels.to_string()
     pixels.free()
     return ret
