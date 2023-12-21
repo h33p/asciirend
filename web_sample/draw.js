@@ -73,7 +73,7 @@ function charWidth(divElement) {
   return [parsedSize / 2.04, parsedSize]
 }
 
-export default async function ascii_render(id, scene_json, is_ortho, fov, znear, zfar, showUsage) {
+export default async function ascii_render(id, scene_json, fw, fh, is_ortho, fov, znear, zfar, showUsage, zoomDisable) {
   await init();
 
   const conv = color_conv(TermColorMode.SingleCol);
@@ -83,8 +83,8 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
   const dom = document.getElementById(id);
   const [cw, ch] = charWidth(dom);
 
-  let w = Math.floor(dom.clientWidth / cw);
-  let h = Math.floor(dom.clientHeight / ch);
+  let w = fw !== null ? fw : Math.floor(dom.clientWidth / cw);
+  let h = fh !== null ? fh : Math.floor(dom.clientHeight / ch);
 
   console.log(w, h, cw, ch);
 
@@ -142,7 +142,7 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
   }
 
   function scrollEvent(e) {
-    if (focused) {
+    if (focused && !zoomDisable) {
       event_scroll(scene, -e.deltaX, -e.deltaY);
       e.preventDefault();
     }
@@ -161,7 +161,7 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
       const distY = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.sqrt(distX * distX + distY * distY);
 
-      if (prevDist !== null) {
+      if (prevDist !== null && !zoomDisable) {
         const diff = dist - prevDist;
         event_scroll(scene, 0, diff);
       }
@@ -201,8 +201,8 @@ export default async function ascii_render(id, scene_json, is_ortho, fov, znear,
   nf()
 
   const v = setInterval(function() {
-    w = Math.floor(dom.clientWidth / cw);
-    h = Math.floor(dom.clientHeight / ch);
+    w = fw !== null ? fw : Math.floor(dom.clientWidth / cw);
+    h = fh !== null ? fh : Math.floor(dom.clientHeight / ch);
 
     const elapsed = performance.now() - startTime;
     performance.mark("asciirend-start-frame");

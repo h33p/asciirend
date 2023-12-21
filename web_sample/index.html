@@ -87,7 +87,7 @@ fn frame_update(state, scene, elapsed) {
 		`;
 		const scene_desc = `{"camera_props":{"proj_mode":"Perspective","fov":0.7,"near":0.01,"far":100.0},"camera_controller":{"fov_y":1.0,"focus_point":[0.0,0.0,0.0],"rot":[-0.25,-0.0669873,0.25,0.93301266],"dist":1.0,"in_motion":"None","scroll_sensitivity":0.02,"orbit_sensitivity":1.0,"last_down":false,"pressed":false},"objects":[{"transform":[0.91837555,-0.39570975,0.0,0.0,0.39570975,0.91837555,0.0,0.0,0.0,0.0,0.99999994,0.0,0.0,0.0,0.0,1.0],"material":1,"ty":{"Cube":{"size":[1.0,1.0,1.0]}},"text":"Test"}],"bg":{"color":[0.01,0.01,0.01]},"dithering":{"count_frames":false,"frame_cnt":4181},"script": ${JSON.stringify(script)}}`;
 		console.log(scene_desc);
-		ascii_render("frame", scene_desc, false, 60.0, 0.01, 100);
+		ascii_render("frame", scene_desc, null, null, false, 60.0, 0.01, 100);
 	</script>
     <link rel="stylesheet" href="style.css">
   <head>
